@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Padel Americano</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+    <div class="header-inner">
+        <div class="brand-mark">PA</div>
+        <div>
+        <h1>Padel Americano</h1>
+            <p>Tournament control desk</p>
+        </div>
+    </div>
+</header>
+
+
+<nav class="tabs">
+    <button class="tab active" onclick="showTab('setup')">Setup</button>
+    <button class="tab" onclick="showTab('pairings')">Pairings</button>
+    <button class="tab" onclick="showTab('scores')">Scores</button>
+    <button class="tab" onclick="showTab('leaderboard')">Leaderboard</button>
+</nav>
+
+
+<div id="setupTab" class="container">
+
+    <div class="card">
+        <h2>Setup Tournament</h2>
+
+        <label>Number of Players</label>
+
+        <select id="playerCount">
+            <option value="8">8</option>
+            <option value="10">10</option>
+            <option value="12">12</option>
+            <option value="14">14</option>
+            <option value="16">16</option>
+            <option value="18">18</option>
+            <option value="20">20</option>
+        </select>
+
+        <button onclick="generatePlayers()">
+            Create Player Fields
+        </button>
+
+        <div id="players"></div>
+
+        <button onclick="createTournament()">
+            Generate Tournament
+        </button>
+    </div>
+</div>
+
+
+<div id="pairingsTab" class="container" style="display:none;">
+    <div class="card">
+        <h2>Pairings</h2>
+        <div id="pairings"></div>
+    </div>
+</div>
+
+<div id="scoresTab" class="container" style="display:none;">
+    <div class="card">
+        <h2>Scores</h2>
+        <div id="scores">
+            Generate a tournament first...
+        </div>
+    </div>
+</div>
+
+<div id="leaderboardTab" class="container" style="display:none;">
+    <div class="card">
+        <h2>Leaderboard</h2>
+
+        <div id="leaderboard">
+            No results yet...
+        </div>
+
+    </div>
+</div>
+
+<script src="live-config.js"></script>
+<script src="live.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

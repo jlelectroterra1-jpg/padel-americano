@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Padel Americano Live</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+    <div class="header-inner">
+        <div class="brand-mark">PA</div>
+        <div>
+            <h1>Live Tournament</h1>
+            <p>Leaderboard and court order</p>
+        </div>
+    </div>
+</header>
+
+<main class="container player-view">
+    <section class="card">
+        <div id="playerStatus" class="leaderboard-note">
+            Waiting for tournament data...
+        </div>
+
+        <div id="playerCurrentRound"></div>
+        <div id="playerNextRound"></div>
+        <div id="playerLeaderboard"></div>
+    </section>
+</main>
+
+<script src="live-config.js"></script>
+<script src="live.js"></script>
+<script src="player.js"></script>
+
+</body>
+</html>

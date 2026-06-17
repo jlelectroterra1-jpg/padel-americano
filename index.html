@@ -1,97 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Padel Americano v2</title>
-<style>
-body{font-family:-apple-system,sans-serif;margin:0;background:#f2f2f7}
-.header{padding:12px;background:#007aff;color:white;text-align:center}
-.tabs{display:flex}
-.tab{flex:1;padding:12px;border:none}
-.section{padding:15px}
-.card{background:white;padding:12px;border-radius:12px;margin-bottom:10px}
-input,select,button{width:100%;padding:10px;margin:4px 0;box-sizing:border-box}
-.hidden{display:none}
-table{width:100%;border-collapse:collapse}
-td,th{border:1px solid #ddd;padding:6px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Padel Americano</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="header"><h2>Padel Americano</h2></div>
 
-<div class="tabs">
-<button class="tab" onclick="showTab('setup')">Setup</button>
-<button class="tab" onclick="showTab('pairings')">Pairings</button>
-<button class="tab" onclick="showTab('leaderboard')">Leaderboard</button>
+<header class="app-header">
+    <div class="header-inner">
+        <div class="brand-mark">PA</div>
+        <div>
+        <h1>Padel Americano</h1>
+            <p>Tournament control desk</p>
+        </div>
+    </div>
+</header>
+
+
+<nav class="tabs">
+    <button class="tab active" onclick="showTab('setup')">Setup</button>
+    <button class="tab" onclick="showTab('pairings')">Pairings</button>
+    <button class="tab" onclick="showTab('scores')">Scores</button>
+    <button class="tab" onclick="showTab('leaderboard')">Leaderboard</button>
+</nav>
+
+
+<div id="setupTab" class="container">
+
+    <div class="card">
+        <h2>Setup Tournament</h2>
+
+        <label>Number of Players</label>
+
+        <select id="playerCount">
+            <option value="8">8</option>
+            <option value="10">10</option>
+            <option value="12">12</option>
+            <option value="14">14</option>
+            <option value="16">16</option>
+            <option value="18">18</option>
+            <option value="20">20</option>
+        </select>
+
+        <button onclick="generatePlayers()">
+            Create Player Fields
+        </button>
+
+        <div id="players"></div>
+
+        <button onclick="createTournament()">
+            Generate Tournament
+        </button>
+    </div>
 </div>
 
-<div id="setup" class="section">
-<div class="card">
-<label>Players</label>
-<select id="count" onchange="buildPlayers()">
-<option>8</option><option>10</option><option>12</option><option>14</option>
-<option>16</option><option>18</option><option>20</option>
-</select>
-<div id="players"></div>
-<button onclick="generate()">Generate Tournament</button>
-</div>
+
+<div id="pairingsTab" class="container" style="display:none;">
+    <div class="card">
+        <h2>Pairings</h2>
+        <div id="pairings"></div>
+    </div>
 </div>
 
-<div id="pairings" class="section hidden"></div>
-<div id="leaderboard" class="section hidden"></div>
+<div id="scoresTab" class="container" style="display:none;">
+    <div class="card">
+        <h2>Scores</h2>
+        <div id="scores">
+            Generate a tournament first...
+        </div>
+    </div>
+</div>
 
-<script>
-function showTab(id){
- ['setup','pairings','leaderboard'].forEach(x=>document.getElementById(x).classList.add('hidden'));
- document.getElementById(id).classList.remove('hidden');
-}
+<div id="leaderboardTab" class="container" style="display:none;">
+    <div class="card">
+        <h2>Leaderboard</h2>
 
-function buildPlayers(){
- let c=parseInt(document.getElementById('count').value);
- let h='';
- for(let i=1;i<=c;i++){
-  h+=`<div class="card">
-  <input placeholder="Player ${i}" class="name">
-  <input placeholder="Playtomic Rating" type="number" step="0.01" class="rating">
-  </div>`;
- }
- document.getElementById('players').innerHTML=h;
-}
-buildPlayers();
+        <div id="leaderboard">
+            No results yet...
+        </div>
 
-function generate(){
- let names=[...document.querySelectorAll('.name')].map(x=>x.value);
- let ratings=[...document.querySelectorAll('.rating')].map(x=>x.value);
- let rounds=names.length-1;
- let target=names.length<=12?21:(names.length<=16?17:13);
+    </div>
+</div>
 
- document.getElementById('pairings').innerHTML=`
- <div class="card">
- <h3>Tournament Created</h3>
- <p>Players: ${names.length}</p>
- <p>Rounds: ${rounds}</p>
- <p>Target Score: ${target}</p>
- <p>Service Rotation: 4 servers</p>
- <p>This version is the framework. Next step is adding the full Americano scheduling engine, score capture, and partner/opponent tracking.</p>
- </div>`;
+<script src="live-config.js"></script>
+<script src="live.js"></script>
+<script src="app.js"></script>
 
- let players=names.map((n,i)=>({n,r:parseFloat(ratings[i]||0)}))
- .sort((a,b)=>b.r-a.r);
-
- let rows=players.map((p,i)=>`<tr><td>${i+1}</td><td>${p.n}</td><td>${p.r}</td></tr>`).join('');
-
- document.getElementById('leaderboard').innerHTML=`
- <div class="card">
- <h3>Expected Ranking</h3>
- <table>
- <tr><th>#</th><th>Player</th><th>Rating</th></tr>
- ${rows}
- </table>
- </div>`;
-
- showTab('pairings');
-}
-</script>
 </body>
 </html>

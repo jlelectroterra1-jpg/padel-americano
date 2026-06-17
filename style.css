@@ -192,6 +192,35 @@ select:focus{
     border-color:var(--brand);
 }
 
+.toggle-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:max-content;
+    max-width:100%;
+    margin:16px 0;
+    padding:10px 12px;
+    background:rgba(13,20,34,0.72);
+    border:1px solid var(--line-soft);
+    border-radius:var(--radius);
+    cursor:pointer;
+}
+
+.toggle-row input{
+    width:18px;
+    min-height:18px;
+    height:18px;
+    margin:0;
+    padding:0;
+    accent-color:var(--brand);
+}
+
+.toggle-row span{
+    color:var(--text);
+    font-size:13px;
+    font-weight:900;
+}
+
 button{
     margin-top:14px;
     background:linear-gradient(135deg,var(--brand-strong),#2563eb);

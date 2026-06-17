@@ -13,6 +13,9 @@ function generatePlayers(){
 
     container.innerHTML = "";
 
+    const useRatings =
+        shouldUsePlaytomicRatings();
+
     for(let i=1;i<=count;i++){
 
       container.innerHTML += `
@@ -26,6 +29,7 @@ function generatePlayers(){
         id="player${i}"
     >
 
+    <div class="rating-field" style="${useRatings ? "" : "display:none;"}">
     <label>Playtomic Rating</label>
     <input
         type="number"
@@ -33,9 +37,27 @@ function generatePlayers(){
         placeholder="e.g. 3.25"
         id="rating${i}"
     >
+    </div>
 </div>
 `;
     }
+}
+
+function shouldUsePlaytomicRatings(){
+    const checkbox =
+        document.getElementById("usePlaytomicRatings");
+
+    return Boolean(checkbox && checkbox.checked);
+}
+
+function togglePlaytomicRatings(){
+    const useRatings =
+        shouldUsePlaytomicRatings();
+
+    document.querySelectorAll(".rating-field").forEach(field=>{
+        field.style.display =
+            useRatings ? "block" : "none";
+    });
 }
 
 
@@ -621,17 +643,22 @@ if(count < 8 || count > 20 || count % 2 !== 0){
     targetScore =
     count <= 8 ? 21 : 15;
 
-    if (!continueTournament) {
+if (!continueTournament) {
+const useRatings =
+    shouldUsePlaytomicRatings();
 
 for(let i=1;i<=count;i++){
 
     const playerName =
         document.getElementById(`player${i}`).value || `Player ${i}`;
 
+    const ratingInput =
+        document.getElementById(`rating${i}`);
+
     const playerRating =
-        parseFloat(
-            document.getElementById(`rating${i}`).value
-        ) || 0;
+        useRatings && ratingInput
+            ? parseFloat(ratingInput.value) || 0
+            : 0;
 
     tournamentPlayers.push({
         name: playerName,

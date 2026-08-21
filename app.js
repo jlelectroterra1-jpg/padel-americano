@@ -1,8 +1,39 @@
 
 
 
-function generatePlayers(){
+function getTournamentFormat(){
+    const select =
+        document.getElementById("tournamentFormat");
 
+    return select ? select.value : "singles";
+}
+
+function playerFieldHtml(index, useRatings){
+    return `
+<div class="player-card">
+    <h4>Player ${index}</h4>
+
+    <label>Name</label>
+    <input
+        type="text"
+        placeholder="Player ${index} Name"
+        id="player${index}"
+    >
+
+    <div class="rating-field" style="${useRatings ? "" : "display:none;"}">
+    <label>Playtomic Rating</label>
+    <input
+        type="number"
+        step="0.01"
+        placeholder="e.g. 3.25"
+        id="rating${index}"
+    >
+    </div>
+</div>
+`;
+}
+
+function generatePlayers(){
 
     const count = parseInt(
         document.getElementById("playerCount").value
@@ -16,30 +47,27 @@ function generatePlayers(){
     const useRatings =
         shouldUsePlaytomicRatings();
 
-    for(let i=1;i<=count;i++){
+    if(getTournamentFormat() === "teams"){
+        for(let team=0; team<count / 2; team++){
+            const playerA = team * 2 + 1;
+            const playerB = team * 2 + 2;
 
-      container.innerHTML += `
-<div class="player-card">
-    <h4>Player ${i}</h4>
-
-    <label>Name</label>
-    <input
-        type="text"
-        placeholder="Player ${i} Name"
-        id="player${i}"
-    >
-
-    <div class="rating-field" style="${useRatings ? "" : "display:none;"}">
-    <label>Playtomic Rating</label>
-    <input
-        type="number"
-        step="0.01"
-        placeholder="e.g. 3.25"
-        id="rating${i}"
-    >
+            container.innerHTML += `
+<div class="team-card">
+    <h4>Team ${team + 1}</h4>
+    <div class="team-players">
+        ${playerFieldHtml(playerA, useRatings)}
+        ${playerFieldHtml(playerB, useRatings)}
     </div>
 </div>
 `;
+        }
+
+        return;
+    }
+
+    for(let i=1;i<=count;i++){
+        container.innerHTML += playerFieldHtml(i, useRatings);
     }
 }
 
@@ -63,6 +91,7 @@ function togglePlaytomicRatings(){
 
 
 let tournamentPlayers = [];
+let tournamentFormat = "singles";
 
 let currentRound = 1;
 let totalRounds = 0;
@@ -614,6 +643,51 @@ function balanceTeamSides(rounds, players){
 }
 
 /* ================================================================== rounds generation ============================================================== */
+/*
+ * Teams format: partners are fixed (player 1+2 = team 1, 3+4 = team 2,
+ * ...), so this is a plain round-robin between teams - every team
+ * plays every other team exactly once - via the classic "circle
+ * method": fix the first team, rotate the rest each round. A null
+ * placeholder handles an odd team count by giving one team a bye.
+ */
+function generateTeamSchedule(players){
+    const teams = [];
+
+    for(let i=0; i<players.length; i+=2){
+        teams.push([players[i], players[i + 1]]);
+    }
+
+    const hasBye = teams.length % 2 !== 0;
+    const rotating = hasBye ? [...teams, null] : [...teams];
+    const totalRounds = rotating.length - 1;
+
+    const rounds = [];
+
+    for(let round=0; round<totalRounds; round++){
+        const roundPairs = [];
+
+        for(let i=0; i<rotating.length / 2; i++){
+            const teamA = rotating[i];
+            const teamB = rotating[rotating.length - 1 - i];
+
+            if(teamA && teamB){
+                roundPairs.push(teamA, teamB);
+            }
+        }
+
+        rounds.push(createRound(players, roundPairs));
+
+        const fixed = rotating[0];
+        const rest = rotating.slice(1);
+
+        rest.unshift(rest.pop());
+
+        rotating.splice(0, rotating.length, fixed, ...rest);
+    }
+
+    return rounds;
+}
+
 function generateAmericanoSchedule(players) {
     const count = players.length;
 
@@ -622,7 +696,9 @@ function generateAmericanoSchedule(players) {
         return [];
     }
 
-    return generateBalancedSchedule(players);
+    return tournamentFormat === "teams"
+        ? generateTeamSchedule(players)
+        : generateBalancedSchedule(players);
 }
 
 /* ================================================================== Create Tournament =============================================================== */
@@ -650,6 +726,8 @@ if(count < 8 || count > 20 || count % 2 !== 0){
     15;
 
 if (!continueTournament) {
+tournamentFormat = getTournamentFormat();
+
 const useRatings =
     shouldUsePlaytomicRatings();
 

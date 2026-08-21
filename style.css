@@ -260,6 +260,26 @@ button:active{
     font-size:14px;
 }
 
+.team-card{
+    grid-column:span 2;
+    background:rgba(13,20,34,0.5);
+    border:1px solid var(--line-soft);
+    border-radius:var(--radius);
+    padding:14px;
+}
+
+.team-card h4{
+    margin:0 0 10px;
+    color:#9ff7ea;
+    font-size:14px;
+}
+
+.team-players{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+}
+
 .stat-grid{
     display:grid;
     grid-template-columns:repeat(4,minmax(0,1fr));
@@ -589,6 +609,14 @@ button:active{
     }
 
     #players{
+        grid-template-columns:1fr;
+    }
+
+    .team-card{
+        grid-column:span 1;
+    }
+
+    .team-players{
         grid-template-columns:1fr;
     }
 

@@ -32,6 +32,13 @@
     <div class="card">
         <h2>Setup Tournament</h2>
 
+        <label>Format</label>
+
+        <select id="tournamentFormat" onchange="generatePlayers()">
+            <option value="singles">Singles (rotating partners)</option>
+            <option value="teams">Teams (fixed partners)</option>
+        </select>
+
         <label>Number of Players</label>
 
         <select id="playerCount">

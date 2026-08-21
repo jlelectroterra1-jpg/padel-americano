@@ -368,6 +368,20 @@ button:active{
     max-width:220px;
 }
 
+.live-sync-status{
+    margin:10px 0 0;
+    font-size:0.85em;
+    font-weight:700;
+}
+
+.live-sync-status.ok{
+    color:#7ee787;
+}
+
+.live-sync-status.error{
+    color:#ff7b72;
+}
+
 .share-panel img{
     width:180px;
     height:180px;

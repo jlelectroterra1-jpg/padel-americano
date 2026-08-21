@@ -124,13 +124,6 @@ async function copyPlayerLink(){
     prompt("Copy this player leaderboard link:", link);
 }
 
-function getRoundCount(count){
-    const totalPartnerships =
-        count * (count - 1) / 2;
-
-    return Math.ceil(totalPartnerships / 4);
-}
-
 function getCurrentRoundData(){
     return americanoRounds[currentRound - 1];
 }
@@ -161,165 +154,254 @@ function createRound(players, pairs){
     };
 }
 
-function findDisjointPair(pairs, pairToAvoid){
-    return pairs.findIndex(pair=>{
-        return !pair.includes(pairToAvoid[0]) &&
-            !pair.includes(pairToAvoid[1]);
+/*
+ * Scheduler design (replaces the old partner-only round robin):
+ * every round fills as many courts as the player count allows
+ * (floor(count/4), instead of a hardcoded 2), and both who partners
+ * whom AND who ends up on the opposing team are chosen by greedily
+ * minimising repeat history, not by array order. Several randomised
+ * attempts are generated and the most evenly balanced one is kept.
+ */
+
+function choosePlayingPlayers(players, playCount, playersNeeded){
+    const shuffled =
+        [...players].sort(()=> Math.random() - 0.5);
+
+    shuffled.sort((a,b)=>{
+        return playCount[a.name] - playCount[b.name];
     });
+
+    return shuffled.slice(0, playersNeeded);
 }
 
-function selectDisjointPairs(pairs, maxPairs){
-    const selected = [];
-    const usedPlayers = new Set();
+function formPartnerships(playingPlayers, partnerCount){
+    const available =
+        [...playingPlayers].sort(()=> Math.random() - 0.5);
 
-    for(let i=0; i<pairs.length; i++){
-        const pair = pairs[i];
+    const pairs = [];
 
-        if(
-            usedPlayers.has(pair[0].name) ||
-            usedPlayers.has(pair[1].name)
-        ){
-            continue;
-        }
+    while(available.length > 1){
+        const playerA = available.shift();
 
-        selected.push(i);
-        usedPlayers.add(pair[0].name);
-        usedPlayers.add(pair[1].name);
+        let bestIndex = 0;
+        let bestScore = Number.POSITIVE_INFINITY;
 
-        if(selected.length === maxPairs){
-            break;
-        }
-    }
+        for(let i=0; i<available.length; i++){
+            const playerB = available[i];
+            const key = getPairKey(playerA, playerB);
 
-    return selected;
-}
+            const score =
+                (partnerCount[key] || 0) + Math.random() * 0.01;
 
-function removeSelectedPairs(pairs, selectedIndexes){
-    return pairs.filter((pair,index)=>{
-        return !selectedIndexes.includes(index);
-    });
-}
-
-function generateRoundRobinPartnerSchedule(players){
-    const rotatingPlayers = [...players];
-    const rounds = [];
-    let pendingPairs = [];
-
-    for(let round=0; round<players.length - 1; round++){
-        const pairs = [];
-
-        for(let i=0; i<players.length / 2; i++){
-            pairs.push([
-                rotatingPlayers[i],
-                rotatingPlayers[players.length - 1 - i]
-            ]);
-        }
-
-        let availablePairs = [
-            ...pendingPairs,
-            ...pairs
-        ];
-
-        pendingPairs = [];
-
-        while(availablePairs.length >= 4){
-            const selectedIndexes =
-                selectDisjointPairs(availablePairs, 4);
-
-            if(selectedIndexes.length < 4){
-                break;
+            if(score < bestScore){
+                bestScore = score;
+                bestIndex = i;
             }
-
-            const roundPairs =
-                selectedIndexes.map(index=>{
-                    return availablePairs[index];
-                });
-
-            rounds.push(
-                createRound(
-                    players,
-                    roundPairs
-                )
-            );
-
-            availablePairs =
-                removeSelectedPairs(
-                    availablePairs,
-                    selectedIndexes
-                );
         }
 
-        pendingPairs = availablePairs;
+        const playerB =
+            available.splice(bestIndex, 1)[0];
 
-        const fixedPlayer =
-            rotatingPlayers[0];
-
-        const rest =
-            rotatingPlayers.slice(1);
-
-        rest.unshift(rest.pop());
-
-        rotatingPlayers.splice(
-            0,
-            rotatingPlayers.length,
-            fixedPlayer,
-            ...rest
-        );
+        pairs.push([playerA, playerB]);
     }
 
-    while(pendingPairs.length > 0){
-        const selectedIndexes =
-            selectDisjointPairs(
-                pendingPairs,
-                Math.min(4,pendingPairs.length)
-            );
+    return pairs;
+}
 
-        let finalPairs =
-            selectedIndexes.map(index=>{
-                return pendingPairs[index];
-            });
+function opponentScore(pairA, pairB, opponentCount){
+    let score = 0;
 
-        pendingPairs =
-            removeSelectedPairs(
-                pendingPairs,
-                selectedIndexes
-            );
+    pairA.forEach(playerA=>{
+        pairB.forEach(playerB=>{
+            score += opponentCount[playerA.name][playerB.name] || 0;
+        });
+    });
 
-        if(finalPairs.length % 2 !== 0){
-            const finalRoundPlayers =
-                new Set();
+    return score;
+}
 
-            finalPairs.forEach(pair=>{
-                finalRoundPlayers.add(pair[0]);
-                finalRoundPlayers.add(pair[1]);
-            });
+function assignCourts(pairs, opponentCount){
+    const available =
+        [...pairs].sort(()=> Math.random() - 0.5);
 
-            const repeatPair =
-                players.find(playerA=>{
-                    return !finalRoundPlayers.has(playerA);
-                });
+    const ordered = [];
 
-            const repeatPartner =
-                players.find(playerB=>{
-                    return playerB !== repeatPair &&
-                        !finalRoundPlayers.has(playerB);
-                });
+    while(available.length > 1){
+        const pairA = available.shift();
 
-            finalPairs.push([
-                repeatPair,
-                repeatPartner
-            ]);
+        let bestIndex = 0;
+        let bestScore = Number.POSITIVE_INFINITY;
+
+        for(let i=0; i<available.length; i++){
+            const score =
+                opponentScore(pairA, available[i], opponentCount) +
+                Math.random() * 0.01;
+
+            if(score < bestScore){
+                bestScore = score;
+                bestIndex = i;
+            }
         }
 
-        rounds.push(
-            createRound(
-                players,
-                finalPairs
-            )
+        const pairB =
+            available.splice(bestIndex, 1)[0];
+
+        ordered.push(pairA, pairB);
+    }
+
+    return ordered;
+}
+
+function recordRoundHistory(round, courts, playCount, partnerCount, opponentCount){
+    round.pairs.forEach(pair=>{
+        pair.forEach(player=>{
+            playCount[player.name]++;
+        });
+
+        const key = getPairKey(pair[0], pair[1]);
+        partnerCount[key] = (partnerCount[key] || 0) + 1;
+    });
+
+    for(let court=0; court<courts; court++){
+        const teamA = round.pairs[court * 2];
+        const teamB = round.pairs[court * 2 + 1];
+
+        if(!teamA || !teamB) continue;
+
+        teamA.forEach(playerA=>{
+            teamB.forEach(playerB=>{
+                opponentCount[playerA.name][playerB.name] =
+                    (opponentCount[playerA.name][playerB.name] || 0) + 1;
+
+                opponentCount[playerB.name][playerA.name] =
+                    (opponentCount[playerB.name][playerA.name] || 0) + 1;
+            });
+        });
+    }
+}
+
+function buildScheduleAttempt(players, courts, playersPerRound, totalRounds){
+    const playCount = {};
+    const partnerCount = {};
+    const opponentCount = {};
+
+    players.forEach(player=>{
+        playCount[player.name] = 0;
+        opponentCount[player.name] = {};
+    });
+
+    const rounds = [];
+
+    for(let i=0; i<totalRounds; i++){
+        const playing =
+            choosePlayingPlayers(players, playCount, playersPerRound);
+
+        const pairs =
+            formPartnerships(playing, partnerCount);
+
+        const courtOrder =
+            assignCourts(pairs, opponentCount);
+
+        const round =
+            createRound(players, courtOrder);
+
+        recordRoundHistory(
+            round,
+            courts,
+            playCount,
+            partnerCount,
+            opponentCount
         );
+
+        rounds.push(round);
     }
 
     return rounds;
+}
+
+function scheduleQuality(rounds, players){
+    const opponentCount = {};
+
+    players.forEach(player=>{
+        opponentCount[player.name] = {};
+    });
+
+    let maxRepeat = 0;
+    let sumSquares = 0;
+
+    rounds.forEach(round=>{
+        const courtCount =
+            Math.floor(round.pairs.length / 2);
+
+        for(let court=0; court<courtCount; court++){
+            const teamA = round.pairs[court * 2];
+            const teamB = round.pairs[court * 2 + 1];
+
+            if(!teamA || !teamB) continue;
+
+            teamA.forEach(playerA=>{
+                teamB.forEach(playerB=>{
+                    const count =
+                        (opponentCount[playerA.name][playerB.name] || 0) + 1;
+
+                    opponentCount[playerA.name][playerB.name] = count;
+                    opponentCount[playerB.name][playerA.name] = count;
+
+                    maxRepeat = Math.max(maxRepeat, count);
+                });
+            });
+        }
+    });
+
+    players.forEach(player=>{
+        Object.values(opponentCount[player.name]).forEach(count=>{
+            sumSquares += count * count;
+        });
+    });
+
+    return {maxRepeat, sumSquares};
+}
+
+function generateBalancedSchedule(players, attempts = 40){
+    const count = players.length;
+
+    const courts = Math.floor(count / 4);
+    const playersPerRound = courts * 4;
+
+    const totalPartnerships = count * (count - 1) / 2;
+    const partnershipsPerRound = courts * 2;
+
+    const totalRounds =
+        Math.ceil(totalPartnerships / partnershipsPerRound);
+
+    let best = null;
+
+    for(let attempt=0; attempt<attempts; attempt++){
+        const rounds =
+            buildScheduleAttempt(
+                players,
+                courts,
+                playersPerRound,
+                totalRounds
+            );
+
+        const quality =
+            scheduleQuality(rounds, players);
+
+        const isBetter =
+            !best ||
+            quality.maxRepeat < best.quality.maxRepeat ||
+            (
+                quality.maxRepeat === best.quality.maxRepeat &&
+                quality.sumSquares < best.quality.sumSquares
+            );
+
+        if(isBetter){
+            best = {rounds, quality};
+        }
+    }
+
+    return best.rounds;
 }
 
 function countUniquePartners(rounds){
@@ -441,17 +523,48 @@ function getPublicTournamentState(){
     };
 }
 
+function setLiveSyncStatus(text, isError){
+    const status =
+        document.getElementById("liveSyncStatus");
+
+    if(!status){
+        return;
+    }
+
+    status.textContent = text;
+    status.classList.toggle("error", Boolean(isError));
+    status.classList.toggle("ok", !isError);
+}
+
 function publishTournamentState(){
     if(
         window.PadelLive &&
         americanoRounds.length > 0
     ){
+        if(!window.PadelLive.hasSupabase()){
+            setLiveSyncStatus(
+                "Live sync: not configured (players on other devices won't see updates).",
+                true
+            );
+            return;
+        }
+
         window.PadelLive.saveTournamentState(
             getPublicTournamentState()
-        ).catch(error=>{
+        ).then(()=>{
+            setLiveSyncStatus(
+                `Live sync: OK · updated ${new Date().toLocaleTimeString()}`,
+                false
+            );
+        }).catch(error=>{
             console.warn(
                 "Could not publish live tournament state",
                 error
+            );
+
+            setLiveSyncStatus(
+                `Live sync failed: ${error.message}. Check your Supabase project is active and the API key is valid.`,
+                true
             );
         });
     }
@@ -500,116 +613,6 @@ function balanceTeamSides(rounds, players){
     return rounds;
 }
 
-function ensureEnoughRounds(rounds, players, neededRounds){
-    const playCount = {};
-    const partnerCount = {};
-    const opponentCount = {};
-
-    players.forEach(player=>{
-        playCount[player.name] = 0;
-        opponentCount[player.name] = {};
-    });
-
-    function pairKey(playerA, playerB){
-        return [playerA.name, playerB.name]
-            .sort()
-            .join("|");
-    }
-
-    function updateHistory(round){
-        round.pairs.forEach(pair=>{
-            pair.forEach(player=>{
-                playCount[player.name]++;
-            });
-
-            const key = pairKey(pair[0], pair[1]);
-            partnerCount[key] =
-                (partnerCount[key] || 0) + 1;
-        });
-
-        for(let i=0; i<round.pairs.length; i+=2){
-            const teamA = round.pairs[i];
-            const teamB = round.pairs[i + 1];
-
-            if(!teamA || !teamB) continue;
-
-            teamA.forEach(playerA=>{
-                teamB.forEach(playerB=>{
-                    opponentCount[playerA.name][playerB.name] =
-                        (opponentCount[playerA.name][playerB.name] || 0) + 1;
-
-                    opponentCount[playerB.name][playerA.name] =
-                        (opponentCount[playerB.name][playerA.name] || 0) + 1;
-                });
-            });
-        }
-    }
-
-    rounds.forEach(round=>{
-        updateHistory(round);
-    });
-
-    while(rounds.length < neededRounds){
-        const sortedPlayers =
-            [...players].sort((a,b)=>{
-                const diff =
-                    playCount[a.name] - playCount[b.name];
-
-                if(diff !== 0){
-                    return diff;
-                }
-
-                return Math.random() - 0.5;
-            });
-
-        const playing =
-            sortedPlayers.slice(0,8);
-
-        const resting =
-            sortedPlayers.slice(8);
-
-        const available = [...playing];
-        const pairs = [];
-
-        while(available.length > 1){
-            const p1 = available.shift();
-            let bestPartnerIndex = 0;
-            let bestScore = Number.POSITIVE_INFINITY;
-
-            for(let i=0; i<available.length; i++){
-                const p2 = available[i];
-                const key = pairKey(p1, p2);
-
-                const score =
-                    ((partnerCount[key] || 0) * 100) +
-                    ((opponentCount[p1.name][p2.name] || 0) * 10) +
-                    Math.abs(playCount[p1.name] - playCount[p2.name]) +
-                    Math.random();
-
-                if(score < bestScore){
-                    bestScore = score;
-                    bestPartnerIndex = i;
-                }
-            }
-
-            const p2 =
-                available.splice(bestPartnerIndex,1)[0];
-
-            pairs.push([p1,p2]);
-        }
-
-        const newRound = {
-            resting,
-            pairs
-        };
-
-        rounds.push(newRound);
-        updateHistory(newRound);
-    }
-
-    return rounds;
-}
-
 /* ================================================================== rounds generation ============================================================== */
 function generateAmericanoSchedule(players) {
     const count = players.length;
@@ -619,7 +622,7 @@ function generateAmericanoSchedule(players) {
         return [];
     }
 
-    return generateRoundRobinPartnerSchedule(players);
+    return generateBalancedSchedule(players);
 }
 
 /* ================================================================== Create Tournament =============================================================== */
@@ -730,6 +733,7 @@ let pairingsHTML = `
         <p>${getPlayerViewNote()}</p>
         <a href="${getPlayerViewUrl()}" target="_blank">${getPlayerViewUrl()}</a>
         <button type="button" onclick="copyPlayerLink()">Copy Player Link</button>
+        <p id="liveSyncStatus" class="live-sync-status"></p>
     </div>
     <img
         src="${getQrCodeUrl()}"

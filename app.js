@@ -646,6 +646,7 @@ if(count < 8 || count > 20 || count % 2 !== 0){
     targetScore =
     count <= 8 ? 21 :
     count <= 12 ? 19 :
+    count <= 16 ? 17 :
     15;
 
 if (!continueTournament) {
@@ -726,7 +727,9 @@ let pairingsHTML = `
                 ? "5 / 5 / 5 / 6"
                 : targetScore === 19
                     ? "5 / 5 / 5 / 4"
-                    : "4 / 4 / 4 / 3"}</strong>
+                    : targetScore === 17
+                        ? "4 / 4 / 4 / 5"
+                        : "4 / 4 / 4 / 3"}</strong>
         </div>
     </div>
 </section>

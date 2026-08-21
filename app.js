@@ -691,8 +691,8 @@ function generateTeamSchedule(players){
 function generateAmericanoSchedule(players) {
     const count = players.length;
 
-    if(count < 8 || count > 20 || count % 2 !== 0){
-        alert("Please choose an even player count from 8 to 20.");
+    if(count < 6 || count > 20 || count % 2 !== 0){
+        alert("Please choose an even player count from 6 to 20.");
         return [];
     }
 
@@ -714,8 +714,8 @@ function createTournament(continueTournament = false){
         document.getElementById("playerCount").value
     );
 
-if(count < 8 || count > 20 || count % 2 !== 0){
-    alert("Please choose an even player count from 8 to 20.");
+if(count < 6 || count > 20 || count % 2 !== 0){
+    alert("Please choose an even player count from 6 to 20.");
     return;
 }
 

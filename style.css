@@ -476,6 +476,12 @@ button:active{
     font-weight:900;
 }
 
+.score-input.ghost-value{
+    color:var(--muted);
+    font-style:italic;
+    border-style:dashed;
+}
+
 .score-summary{
     background:rgba(13,20,34,0.86);
     border:1px solid rgba(45,212,191,0.35);

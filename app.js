@@ -1344,4 +1344,61 @@ createTournament(true);
 showTab("scores");
 }
 
+/*
+ * Auto-fill the other score in a court as soon as one is entered
+ * (they have to add up to targetScore anyway), styled as a "ghost"
+ * value the player can just accept or type over. Bound once via
+ * delegation on the stable #scores container since its contents get
+ * replaced on every round render.
+ */
+function handleScoreInput(event){
+    const input = event.target;
+
+    if(!input.classList.contains("score-input")){
+        return;
+    }
+
+    const court =
+        input.closest(".court-card");
+
+    if(!court){
+        return;
+    }
+
+    const inputs =
+        Array.from(court.querySelectorAll(".score-input"));
+
+    const other =
+        inputs.find(el => el !== input);
+
+    if(!other){
+        return;
+    }
+
+    input.classList.remove("ghost-value");
+
+    const enteredValue = parseInt(input.value);
+
+    const isValid =
+        !isNaN(enteredValue) &&
+        enteredValue >= 0 &&
+        enteredValue <= targetScore;
+
+    if(!isValid){
+        return;
+    }
+
+    const otherIsUnconfirmed =
+        other.classList.contains("ghost-value") ||
+        other.value === "";
+
+    if(otherIsUnconfirmed){
+        other.value = targetScore - enteredValue;
+        other.classList.add("ghost-value");
+    }
+}
+
+document.getElementById("scores")
+    .addEventListener("input", handleScoreInput);
+
 generatePlayers();

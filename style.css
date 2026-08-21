@@ -240,6 +240,22 @@ button:active{
     transform:translateY(0);
 }
 
+.ghost-button{
+    width:auto;
+    min-height:auto;
+    margin-top:0;
+    padding:8px 14px;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--text);
+    font-size:13px;
+}
+
+.ghost-button:hover{
+    filter:none;
+    border-color:var(--brand);
+}
+
 #players{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -590,6 +606,116 @@ button:active{
 .player-view .card{
     max-width:980px;
     margin:0 auto;
+}
+
+.leaderboard-header-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:4px;
+}
+
+.leaderboard-header-row h2{
+    margin:0;
+}
+
+/* ---------- Compact "screenshot" standings view ---------- */
+
+body.compact-mode .app-header,
+body.compact-mode .tabs{
+    display:none;
+}
+
+body.compact-mode #leaderboardTab.container{
+    padding:14px 12px 20px;
+    max-width:100%;
+}
+
+body.compact-mode #leaderboardTab .card{
+    border-radius:0;
+    border:none;
+    box-shadow:none;
+    margin-bottom:0;
+    padding:0;
+}
+
+body.compact-mode .leaderboard-header-row{
+    display:none;
+}
+
+.compact-summary-header{
+    text-align:center;
+    padding:10px 0 14px;
+}
+
+.compact-summary-header h2{
+    margin:0 0 4px;
+    font-size:22px;
+}
+
+.compact-summary-header p{
+    margin:0;
+    color:var(--muted);
+    font-size:13px;
+    font-weight:700;
+}
+
+.compact-exit-row{
+    display:flex;
+    justify-content:center;
+    margin-bottom:10px;
+}
+
+.compact-list{
+    columns:1;
+    column-gap:14px;
+}
+
+.compact-list.two-col{
+    columns:2;
+}
+
+.compact-row{
+    display:grid;
+    grid-template-columns:26px 1fr auto auto;
+    align-items:center;
+    gap:8px;
+    padding:7px 8px;
+    border-bottom:1px solid var(--line-soft);
+    break-inside:avoid;
+    font-size:14px;
+}
+
+.compact-row:nth-child(odd){
+    background:rgba(13,20,34,0.55);
+}
+
+.compact-rank{
+    font-weight:900;
+    color:#9ff7ea;
+    font-size:13px;
+}
+
+.compact-name{
+    font-weight:800;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.compact-avg{
+    font-weight:900;
+    color:var(--brand);
+    font-size:13px;
+    white-space:nowrap;
+}
+
+.compact-wins{
+    color:var(--muted);
+    font-size:11px;
+    font-weight:700;
+    white-space:nowrap;
 }
 
 @media (max-width: 860px){

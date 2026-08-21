@@ -1082,14 +1082,76 @@ function renderScores(){
     scoresContainer.innerHTML = scoresHTML;
 }
 
-function updateLeaderboard(){
+let compactLeaderboardMode = false;
 
-    let html = `
-    <h3 class="section-title">Leaderboard</h3>
-    <div class="leaderboard-note">
-        Ranked by average points per game. Each player receives their team's score for the match.
+function toggleCompactLeaderboard(){
+    compactLeaderboardMode = !compactLeaderboardMode;
+
+    document.body.classList.toggle(
+        "compact-mode",
+        compactLeaderboardMode
+    );
+
+    if(compactLeaderboardMode){
+        showTab("leaderboard");
+    }
+
+    updateLeaderboard();
+}
+
+function getLeaderboardStatusLabel(){
+    if(americanoRounds.length === 0){
+        return "No results yet";
+    }
+
+    if(currentRound > totalRounds){
+        return `${totalRounds} rounds played`;
+    }
+
+    return `Standings after Round ${Math.max(currentRound - 1, 0)} of ${totalRounds}`;
+}
+
+function renderCompactLeaderboardHtml(sortedPlayers){
+    const listClass =
+        tournamentPlayers.length > 10
+            ? "compact-list two-col"
+            : "compact-list";
+
+    let rows = "";
+
+    sortedPlayers.forEach((player, index)=>{
+        const average =
+            player.played > 0
+                ? (player.points / player.played).toFixed(1)
+                : "0.0";
+
+        rows += `
+        <div class="compact-row">
+            <span class="compact-rank">${index + 1}</span>
+            <span class="compact-name">${player.name}</span>
+            <span class="compact-avg">${average}</span>
+            <span class="compact-wins">${player.wins}W</span>
+        </div>
+        `;
+    });
+
+    return `
+    <div class="compact-summary-header">
+        <h2>${currentRound > totalRounds ? "🏆 Final Standings" : "Standings"}</h2>
+        <p>${getLeaderboardStatusLabel()}</p>
+    </div>
+    <div class="compact-exit-row">
+        <button type="button" class="ghost-button" onclick="toggleCompactLeaderboard()">
+            Exit Compact View
+        </button>
+    </div>
+    <div class="${listClass}">
+        ${rows}
     </div>
     `;
+}
+
+function updateLeaderboard(){
 
     const sortedPlayers =
         [...tournamentPlayers]
@@ -1118,6 +1180,20 @@ function updateLeaderboard(){
 
             return b.points - a.points;
         });
+
+    if(compactLeaderboardMode){
+        document.getElementById("leaderboard").innerHTML =
+            renderCompactLeaderboardHtml(sortedPlayers);
+
+        return;
+    }
+
+    let html = `
+    <h3 class="section-title">Leaderboard</h3>
+    <div class="leaderboard-note">
+        Ranked by average points per game. Each player receives their team's score for the match.
+    </div>
+    `;
 
     sortedPlayers.forEach((player,index)=>{
         const average =

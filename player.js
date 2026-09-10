@@ -45,25 +45,27 @@ function renderPublicLeaderboard(players){
                 <strong>${player.name}</strong>
                 <span>Partners ${player.partners}</span>
             </div>
-            <div class="leaderboard-stat">
-                <span>Total Points</span>
-                <strong>${player.points}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>Avg/Game</span>
-                <strong>${player.average}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>+/-</span>
-                <strong>${player.diff}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>Played</span>
-                <strong>${player.played}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>Wins</span>
-                <strong>${player.wins}</strong>
+            <div class="leaderboard-stats">
+                <div class="leaderboard-stat">
+                    <span>Total Points</span>
+                    <strong>${player.points}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>Avg/Game</span>
+                    <strong>${player.average}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>+/-</span>
+                    <strong>${player.diff}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>Played</span>
+                    <strong>${player.played}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>Wins</span>
+                    <strong>${player.wins}</strong>
+                </div>
             </div>
         </div>
         `;

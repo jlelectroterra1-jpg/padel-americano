@@ -861,8 +861,6 @@ let pairingsHTML = `
         src="${getQrCodeUrl()}"
         alt="QR code for player live view">
 </section>
-
-<h3 class="section-title">Pairings</h3>
 `;
 
 if(currentRound > totalRounds){
@@ -1226,7 +1224,6 @@ function updateLeaderboard(){
     }
 
     let html = `
-    <h3 class="section-title">Leaderboard</h3>
     <div class="leaderboard-note">
         Ranked by average points per game. Each player receives their team's score for the match.
     </div>
@@ -1253,25 +1250,27 @@ function updateLeaderboard(){
                 <strong>${player.name}</strong>
                 <span>Partners ${player.partners.length}/${tournamentPlayers.length - 1}</span>
             </div>
-            <div class="leaderboard-stat">
-                <span>Total Points</span>
-                <strong>${player.points}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>Avg/Game</span>
-                <strong>${average}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>+/-</span>
-                <strong>${diffLabel}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>Played</span>
-                <strong>${player.played}</strong>
-            </div>
-            <div class="leaderboard-stat">
-                <span>Wins</span>
-                <strong>${player.wins}</strong>
+            <div class="leaderboard-stats">
+                <div class="leaderboard-stat">
+                    <span>Total Points</span>
+                    <strong>${player.points}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>Avg/Game</span>
+                    <strong>${average}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>+/-</span>
+                    <strong>${diffLabel}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>Played</span>
+                    <strong>${player.played}</strong>
+                </div>
+                <div class="leaderboard-stat">
+                    <span>Wins</span>
+                    <strong>${player.wins}</strong>
+                </div>
             </div>
         </div>
         `;

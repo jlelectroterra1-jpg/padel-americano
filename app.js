@@ -350,17 +350,31 @@ function buildScheduleAttempt(players, courts, playersPerRound, totalRounds){
 
 function scheduleQuality(rounds, players){
     const opponentCount = {};
+    const partnerCount = {};
 
     players.forEach(player=>{
         opponentCount[player.name] = {};
+        partnerCount[player.name] = {};
     });
 
     let maxRepeat = 0;
     let sumSquares = 0;
+    let maxPartnerRepeat = 0;
+    let partnerSumSquares = 0;
 
     rounds.forEach(round=>{
         const courtCount =
             Math.floor(round.pairs.length / 2);
+
+        round.pairs.forEach(pair=>{
+            const count =
+                (partnerCount[pair[0].name][pair[1].name] || 0) + 1;
+
+            partnerCount[pair[0].name][pair[1].name] = count;
+            partnerCount[pair[1].name][pair[0].name] = count;
+
+            maxPartnerRepeat = Math.max(maxPartnerRepeat, count);
+        });
 
         for(let court=0; court<courtCount; court++){
             const teamA = round.pairs[court * 2];
@@ -386,12 +400,16 @@ function scheduleQuality(rounds, players){
         Object.values(opponentCount[player.name]).forEach(count=>{
             sumSquares += count * count;
         });
+
+        Object.values(partnerCount[player.name]).forEach(count=>{
+            partnerSumSquares += count * count;
+        });
     });
 
-    return {maxRepeat, sumSquares};
+    return {maxRepeat, sumSquares, maxPartnerRepeat, partnerSumSquares};
 }
 
-function generateBalancedSchedule(players, attempts = 40){
+function generateBalancedSchedule(players, attempts = 250){
     const count = players.length;
 
     const courts = Math.floor(count / 4);
@@ -400,8 +418,16 @@ function generateBalancedSchedule(players, attempts = 40){
     const totalPartnerships = count * (count - 1) / 2;
     const partnershipsPerRound = courts * 2;
 
+    /*
+     * Rounding DOWN (rather than up) keeps rounds within the
+     * partnership budget whenever count doesn't divide evenly - going
+     * one round over that budget forces at least one repeat partner
+     * that would otherwise be avoidable (e.g. 10 players: 12 rounds
+     * needs 48 partner-slots for only 45 possible pairs, guaranteeing
+     * a repeat; 11 rounds needs 44, fits with room to spare).
+     */
     const totalRounds =
-        Math.ceil(totalPartnerships / partnershipsPerRound);
+        Math.floor(totalPartnerships / partnershipsPerRound);
 
     let best = null;
 
@@ -422,7 +448,18 @@ function generateBalancedSchedule(players, attempts = 40){
             quality.maxRepeat < best.quality.maxRepeat ||
             (
                 quality.maxRepeat === best.quality.maxRepeat &&
+                quality.maxPartnerRepeat < best.quality.maxPartnerRepeat
+            ) ||
+            (
+                quality.maxRepeat === best.quality.maxRepeat &&
+                quality.maxPartnerRepeat === best.quality.maxPartnerRepeat &&
                 quality.sumSquares < best.quality.sumSquares
+            ) ||
+            (
+                quality.maxRepeat === best.quality.maxRepeat &&
+                quality.maxPartnerRepeat === best.quality.maxPartnerRepeat &&
+                quality.sumSquares === best.quality.sumSquares &&
+                quality.partnerSumSquares < best.quality.partnerSumSquares
             );
 
         if(isBetter){

@@ -1,20 +1,25 @@
 name: Supabase keep-alive
 
-# Supabase free-tier projects auto-pause after about a week with no API
-# activity, which breaks the live score sync. This pings the project
-# twice a week so it never goes idle long enough to pause.
+# Supabase free-tier projects auto-pause after about a week with no
+# real database activity. A plain read risks being served from a
+# cache and not counting as activity, so this does a genuine write
+# (upsert) to a dedicated ping row every day - never touches the
+# real tournament data.
 
 on:
   schedule:
-    - cron: "0 6 * * 1,4"
+    - cron: "0 6 * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST API
+      - name: Write keep-alive ping row to Supabase
         run: |
-          curl -sf "https://zoizkgrjpeetwxltjhqy.supabase.co/rest/v1/tournaments?select=id&limit=1" \
+          curl -sf -X POST "https://zoizkgrjpeetwxltjhqy.supabase.co/rest/v1/tournaments?on_conflict=id" \
             -H "apikey: sb_publishable_O-I3Yg9ZFuVR5hzMl2bGcA_PV3w3ftj" \
-            -H "Authorization: Bearer sb_publishable_O-I3Yg9ZFuVR5hzMl2bGcA_PV3w3ftj"
+            -H "Authorization: Bearer sb_publishable_O-I3Yg9ZFuVR5hzMl2bGcA_PV3w3ftj" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"id\":\"keepalive-ping\",\"state\":{\"ping\":true},\"updated_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"

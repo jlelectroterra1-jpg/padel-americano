@@ -23,8 +23,13 @@
 
 <main class="container player-view">
     <section class="card">
-        <div id="playerStatus" class="leaderboard-note">
-            Waiting for tournament data...
+        <div class="leaderboard-header-row">
+            <div id="playerStatus" class="leaderboard-note">
+                Waiting for tournament data...
+            </div>
+            <button type="button" class="ghost-button" onclick="toggleCompactView()">
+                Compact View
+            </button>
         </div>
 
         <div id="playerCurrentRound"></div>

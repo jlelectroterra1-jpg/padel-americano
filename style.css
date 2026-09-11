@@ -785,6 +785,28 @@ body.compact-mode .leaderboard-header-row{
     display:none;
 }
 
+body.compact-mode .player-view.container{
+    padding:14px 12px 20px;
+    max-width:100%;
+}
+
+body.compact-mode .player-view .card{
+    border-radius:0;
+    border:none;
+    box-shadow:none;
+    margin-bottom:0;
+    padding:0;
+}
+
+body.compact-mode .player-view .card::before{
+    display:none;
+}
+
+body.compact-mode #playerCurrentRound,
+body.compact-mode #playerNextRound{
+    display:none;
+}
+
 .compact-summary-header{
     text-align:center;
     padding:10px 0 14px;

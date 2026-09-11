@@ -74,6 +74,61 @@ function renderPublicLeaderboard(players){
     return html;
 }
 
+let compactMode = false;
+
+function toggleCompactView(){
+    compactMode = !compactMode;
+
+    document.body.classList.toggle(
+        "compact-mode",
+        compactMode
+    );
+
+    refreshPlayerView();
+}
+
+function renderCompactPublicLeaderboard(state){
+    const players = state.leaderboard || [];
+
+    const listClass =
+        players.length > 10
+            ? "compact-list two-col"
+            : "compact-list";
+
+    let rows = "";
+
+    players.forEach((player, index)=>{
+        rows += `
+        <div class="compact-row">
+            <span class="compact-rank">${index + 1}</span>
+            <span class="compact-name">${player.name}</span>
+            <span class="compact-avg">${player.average}</span>
+            <span class="compact-wins">${player.wins}W</span>
+        </div>
+        `;
+    });
+
+    const statusLabel =
+        state.isComplete
+            ? `${state.totalRounds} rounds played`
+            : `Standings after Round ${Math.max(state.currentRound - 1, 0)} of ${state.totalRounds}`;
+
+    return `
+    <div class="compact-summary-header">
+        <h2>${state.isComplete ? "🏆 Final Standings" : "Standings"}</h2>
+        <p>${statusLabel}</p>
+    </div>
+    <div class="compact-exit-row">
+        <button type="button" class="ghost-button" onclick="toggleCompactView()">
+            Exit Compact View
+        </button>
+    </div>
+    <div class="${listClass}">
+        ${rows}
+    </div>
+    `;
+}
+
 async function refreshPlayerView(){
     let state = null;
 
@@ -96,6 +151,15 @@ async function refreshPlayerView(){
         state.isComplete
             ? `Tournament complete - Updated ${new Date(state.updatedAt).toLocaleTimeString()}`
             : `Round ${state.currentRound} of ${state.totalRounds} - Updated ${new Date(state.updatedAt).toLocaleTimeString()}`;
+
+    if(compactMode){
+        document.getElementById("playerCurrentRound").innerHTML = "";
+        document.getElementById("playerNextRound").innerHTML = "";
+        document.getElementById("playerLeaderboard").innerHTML =
+            renderCompactPublicLeaderboard(state);
+
+        return;
+    }
 
     document.getElementById("playerCurrentRound").innerHTML =
         state.isComplete

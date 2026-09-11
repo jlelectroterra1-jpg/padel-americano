@@ -186,6 +186,11 @@ let totalRounds = 0;
 let targetScore = 21;
 let americanoRounds = [];
 let kotcPartnerCounts = {};
+let kotcPhase = "rounds";
+let kotcContinuedPastRotation = false;
+let kotcFinalRanking = [];
+let kotcFinalWinners = [null, null];
+let kotcLastNormalCourtResults = null;
 
 function getPlayerViewUrl(){
     const publicAppUrl =
@@ -916,7 +921,9 @@ function generateInitialKotcRound(players, courts){
 
     recordKotcPartnership(pairs);
 
-    return createRound(players, pairs);
+    const round = createRound(players, pairs);
+    round.kotcType = "normal";
+    return round;
 }
 
 function generateNextKotcRound(courtResults, players, courts){
@@ -948,7 +955,141 @@ function generateNextKotcRound(courtResults, players, courts){
 
     recordKotcPartnership(newPairs);
 
-    return createRound(players, newPairs);
+    const round = createRound(players, newPairs);
+    round.kotcType = "normal";
+    return round;
+}
+
+/*
+ * After each normal King of the Court round, update every player's
+ * Court 1 record: rounds played there, wins there, and their
+ * current/longest consecutive-rounds-on-Court-1 streak (streak
+ * resets to 0 the moment they're not on Court 1).
+ */
+function updateKotcCourt1Stats(roundData, courtResults, players){
+    const court1Names =
+        new Set(roundData.pairs.slice(0, 2).flat().map(p=>p.name));
+
+    const court1WinnerNames =
+        new Set(courtResults[0].winner.map(p=>p.name));
+
+    players.forEach(player=>{
+        const onCourt1 =
+            court1Names.has(player.name);
+
+        if(onCourt1){
+            player.court1Rounds++;
+            player.court1CurrentStreak++;
+
+            player.court1LongestStreak = Math.max(
+                player.court1LongestStreak,
+                player.court1CurrentStreak
+            );
+
+            if(court1WinnerNames.has(player.name)){
+                player.court1Wins++;
+            }
+        } else {
+            player.court1CurrentStreak = 0;
+        }
+    });
+}
+
+function kotcRotationComplete(players){
+    const maxPartners =
+        players.length - 1;
+
+    return players.every(player=>{
+        return player.partners.length >= maxPartners;
+    });
+}
+
+/*
+ * Ranking: most Court 1 wins, then most rounds spent on Court 1,
+ * then longest Court 1 streak, then total wins - each only used to
+ * break ties in the one before it.
+ */
+function getKotcRanking(players){
+    return [...players].sort((a,b)=>{
+        if(b.court1Wins !== a.court1Wins){
+            return b.court1Wins - a.court1Wins;
+        }
+
+        if(b.court1Rounds !== a.court1Rounds){
+            return b.court1Rounds - a.court1Rounds;
+        }
+
+        if(b.court1LongestStreak !== a.court1LongestStreak){
+            return b.court1LongestStreak - a.court1LongestStreak;
+        }
+
+        return b.wins - a.wins;
+    });
+}
+
+/*
+ * Splitting a final's group of 4 into two teams: unlike normal
+ * rounds, there's no "pair they arrived as" to avoid, so all three
+ * ways of splitting 4 people into 2 pairs are eligible - pick
+ * whichever has the lowest total partner-history, breaking ties
+ * randomly among whichever option(s) share that lowest total.
+ */
+function splitFourForFinal(fourPlayers){
+    const [a, b, c, d] = fourPlayers;
+
+    const options = [
+        [[a, b], [c, d]],
+        [[a, c], [b, d]],
+        [[a, d], [b, c]]
+    ];
+
+    function optionScore(option){
+        return option.reduce((sum, pair)=>{
+            const key =
+                getPairKey(pair[0], pair[1]);
+
+            return sum + (kotcPartnerCounts[key] || 0);
+        }, 0);
+    }
+
+    const scored =
+        options.map(option=>({
+            option,
+            score: optionScore(option)
+        }));
+
+    const minScore =
+        Math.min(...scored.map(s=>s.score));
+
+    const bestOptions =
+        scored
+            .filter(s => s.score === minScore)
+            .map(s => s.option);
+
+    return bestOptions[
+        Math.floor(Math.random() * bestOptions.length)
+    ];
+}
+
+function generateKotcFinalsRound(ranking, players){
+    // Top 4 / bottom 4 by rank, as specified - for groups bigger
+    // than 8 that leaves the middle-ranked players without a final
+    // match, matching the spec's worked example exactly rather than
+    // inventing an unrequested middle bracket.
+    const top4 = ranking.slice(0, 4);
+    const bottom4 = ranking.slice(-4);
+
+    const topTeams = splitFourForFinal(top4);
+    const bottomTeams = splitFourForFinal(bottom4);
+
+    const round =
+        createRound(players, [
+            topTeams[0], topTeams[1],
+            bottomTeams[0], bottomTeams[1]
+        ]);
+
+    round.kotcType = "finals";
+    return round;
 }
 
 function generateAmericanoSchedule(players, courts) {
@@ -970,6 +1111,11 @@ function createTournament(continueTournament = false){
         currentRound = 1;
         americanoRounds = [];
         tournamentPlayers = [];
+        kotcPhase = "rounds";
+        kotcContinuedPastRotation = false;
+        kotcFinalRanking = [];
+        kotcFinalWinners = [null, null];
+        kotcLastNormalCourtResults = null;
     }
 
    const count =
@@ -1021,7 +1167,11 @@ for(let i=1;i<=count;i++){
         against: 0,
         played: 0,
         wins: 0,
-        partners: []
+        partners: [],
+        court1Rounds: 0,
+        court1Wins: 0,
+        court1CurrentStreak: 0,
+        court1LongestStreak: 0
     });
 }
 }
@@ -1216,6 +1366,92 @@ function showTab(tabName){
     }
 }
 
+function kotcStandingsHtml(ranking){
+    let html = `
+    <h3 class="section-title">👑 King of the Court Standings</h3>
+    <div class="card">
+    `;
+
+    ranking.forEach((player, index)=>{
+        const isKing =
+            index === 0;
+
+        html += `
+        <div class="leaderboard-row">
+            <div class="rank">${index + 1}</div>
+            <div class="leaderboard-player">
+                <strong>${isKing ? "👑 " : ""}${player.name}</strong>
+                <span>Court 1 wins ${player.court1Wins} · Court 1 rounds ${player.court1Rounds} · Best streak ${player.court1LongestStreak} · Total wins ${player.wins}</span>
+            </div>
+        </div>
+        `;
+    });
+
+    html += `</div>`;
+
+    return html;
+}
+
+function renderKotcFinalsScreen(scoresContainer, roundData){
+    let html = `
+    <div class="score-summary">
+        <p><strong>All players have now partnered with every other player.</strong></p>
+        <p>Normal rounds are done - here's the Court 1 ranking, followed by the Top 4 / Bottom 4 finals.</p>
+    </div>
+    `;
+
+    html += kotcStandingsHtml(kotcFinalRanking);
+
+    html += `<h3 class="section-title">Final Round</h3>`;
+
+    const courtLabels = [
+        "👑 Top Court Final",
+        "Bottom Court Final"
+    ];
+
+    for(let court=0; court<2; court++){
+        const teamA = roundData.pairs[court * 2];
+        const teamB = roundData.pairs[court * 2 + 1];
+        const winner = kotcFinalWinners[court];
+
+        const teamAName = teamA.map(p=>p.name).join(" & ");
+        const teamBName = teamB.map(p=>p.name).join(" & ");
+
+        html += `
+        <div class="court-card">
+            <div class="court-title">${courtLabels[court]}</div>
+            <div class="team">${teamAName}</div>
+            <div class="vs">VS</div>
+            <div class="team">${teamBName}</div>
+        `;
+
+        if(winner){
+            const winnerName =
+                winner.map(p=>p.name).join(" & ");
+
+            html += `
+            <p class="leaderboard-note">Winner: <strong>${winnerName}</strong></p>
+            `;
+        } else {
+            html += `
+            <p class="leaderboard-note">Select winner:</p>
+            <button type="button" onclick="selectKotcFinalWinner(${court}, 0)">${teamAName}</button>
+            <button type="button" onclick="selectKotcFinalWinner(${court}, 1)">${teamBName}</button>
+            `;
+        }
+
+        html += `</div>`;
+    }
+
+    html += `
+    <button type="button" class="ghost-button" onclick="continueKotcPlaying()">
+        Continue Playing Normal Rounds Instead
+    </button>
+    `;
+
+    scoresContainer.innerHTML = html;
+}
+
 function renderScores(){
 
     const scoresContainer =
@@ -1251,6 +1487,21 @@ function renderScores(){
             <p>No more rounds are available.</p>
         </div>
         `;
+        return;
+    }
+
+    if(tournamentFormat === "kotc" && roundData.kotcType === "finals"){
+        if(kotcPhase === "results"){
+            scoresContainer.innerHTML = `
+            <div class="score-summary">
+                <p><strong>Finals complete!</strong></p>
+                <p>See the Leaderboard tab for the final results.</p>
+            </div>
+            `;
+            return;
+        }
+
+        renderKotcFinalsScreen(scoresContainer, roundData);
         return;
     }
 
@@ -1442,7 +1693,34 @@ function renderCompactLeaderboardHtml(sortedPlayers){
     `;
 }
 
+function renderKotcFinalResults(){
+    const topWinner = kotcFinalWinners[0];
+    const bottomWinner = kotcFinalWinners[1];
+    const king = kotcFinalRanking[0];
+
+    let html = `
+    <div class="score-summary">
+        <h3 class="section-title">👑 King of the Court</h3>
+        <p style="font-size:1.4em;margin:0;"><strong>${king.name}</strong></p>
+    </div>
+
+    <div class="leaderboard-note">
+        <strong>Top Court Final Winners:</strong> ${topWinner.map(p=>p.name).join(" & ")}<br>
+        <strong>Bottom Court Final Winners:</strong> ${bottomWinner.map(p=>p.name).join(" & ")}
+    </div>
+    `;
+
+    html += kotcStandingsHtml(kotcFinalRanking);
+
+    document.getElementById("leaderboard").innerHTML = html;
+}
+
 function updateLeaderboard(){
+
+    if(tournamentFormat === "kotc" && kotcPhase === "results"){
+        renderKotcFinalResults();
+        return;
+    }
 
     const sortedPlayers =
         [...tournamentPlayers]
@@ -1552,6 +1830,10 @@ function submitRound(round){
         return;
     }
 
+    if(roundData.kotcType === "finals"){
+        return;
+    }
+
     const courts =
         document.querySelectorAll(
             `input[id^="r${round}c"]`
@@ -1629,6 +1911,35 @@ function submitRound(round){
     }
 
 if(tournamentFormat === "kotc"){
+    updateKotcCourt1Stats(roundData, courtResults, tournamentPlayers);
+
+    const rotationJustCompleted =
+        !kotcContinuedPastRotation &&
+        kotcRotationComplete(tournamentPlayers);
+
+    if(rotationJustCompleted){
+        kotcLastNormalCourtResults = courtResults;
+
+        kotcFinalRanking =
+            getKotcRanking(tournamentPlayers);
+
+        const finalsRound =
+            generateKotcFinalsRound(
+                kotcFinalRanking,
+                tournamentPlayers
+            );
+
+        americanoRounds.push(finalsRound);
+        totalRounds = americanoRounds.length;
+        kotcPhase = "finals";
+
+        currentRound++;
+
+        createTournament(true);
+        showTab("scores");
+        return;
+    }
+
     const nextRound =
         generateNextKotcRound(
             courtResults,
@@ -1678,6 +1989,59 @@ function endKotcTournament(){
 
     currentRound = totalRounds + 1;
     createTournament(true);
+}
+
+/*
+ * Override for the "everyone's partnered with everyone" auto-stop:
+ * throws away the finals round that was just generated, falls back
+ * to the last normal round's results, and resumes normal rotation.
+ * Won't trigger the auto-stop again this session.
+ */
+function continueKotcPlaying(){
+    americanoRounds.pop();
+    totalRounds = americanoRounds.length;
+    currentRound--;
+
+    kotcContinuedPastRotation = true;
+    kotcPhase = "rounds";
+
+    const nextRound =
+        generateNextKotcRound(
+            kotcLastNormalCourtResults,
+            tournamentPlayers,
+            tournamentPlayers.length / 4
+        );
+
+    americanoRounds.push(nextRound);
+    totalRounds = americanoRounds.length;
+
+    currentRound++;
+
+    createTournament(true);
+    showTab("scores");
+}
+
+function selectKotcFinalWinner(courtIndex, teamIndex){
+    const roundData =
+        americanoRounds[currentRound - 1];
+
+    const winningTeam =
+        roundData.pairs[courtIndex * 2 + teamIndex];
+
+    winningTeam.forEach(player=>{
+        player.wins++;
+    });
+
+    kotcFinalWinners[courtIndex] = winningTeam;
+
+    if(kotcFinalWinners[0] && kotcFinalWinners[1]){
+        kotcPhase = "results";
+        showTab("leaderboard");
+    }
+
+    renderScores();
+    updateLeaderboard();
+    publishTournamentState();
 }
 
 /*

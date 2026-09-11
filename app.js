@@ -8,6 +8,71 @@ function getTournamentFormat(){
     return select ? select.value : "singles";
 }
 
+const COURT_COUNT_STORAGE_KEY = "padel-americano:preferredCourtCount";
+
+function getMaxCourts(count){
+    return Math.max(1, Math.floor(count / 4));
+}
+
+function refreshCourtOptions(){
+    const count = parseInt(
+        document.getElementById("playerCount").value
+    );
+
+    const select =
+        document.getElementById("courtCount");
+
+    if(!select || isNaN(count)){
+        return;
+    }
+
+    const maxCourts =
+        getMaxCourts(count);
+
+    const savedValue =
+        parseInt(localStorage.getItem(COURT_COUNT_STORAGE_KEY)) || null;
+
+    select.innerHTML = "";
+
+    for(let courts=1; courts<=maxCourts; courts++){
+        const option =
+            document.createElement("option");
+
+        option.value = courts;
+        option.textContent = courts;
+        select.appendChild(option);
+    }
+
+    /*
+     * Always prefer the saved preference over the previous DOM value
+     * - the old select value is just leftover from whatever player
+     * count was showing a moment ago, not something the user chose
+     * for THIS count, so it shouldn't take priority.
+     */
+    select.value =
+        savedValue && savedValue <= maxCourts
+            ? savedValue
+            : maxCourts;
+}
+
+function saveCourtCountPreference(){
+    const select =
+        document.getElementById("courtCount");
+
+    if(!select){
+        return;
+    }
+
+    localStorage.setItem(COURT_COUNT_STORAGE_KEY, select.value);
+}
+
+function getCourtCount(){
+    const select =
+        document.getElementById("courtCount");
+
+    return select ? parseInt(select.value) || 1 : 1;
+}
+
 function playerFieldHtml(index, useRatings){
     return `
 <div class="player-card">
@@ -38,6 +103,8 @@ function generatePlayers(){
     const count = parseInt(
         document.getElementById("playerCount").value
     );
+
+    refreshCourtOptions();
 
     const container =
         document.getElementById("players");
@@ -92,6 +159,7 @@ function togglePlaytomicRatings(){
 
 let tournamentPlayers = [];
 let tournamentFormat = "singles";
+let courtCount = 1;
 
 let currentRound = 1;
 let totalRounds = 0;
@@ -409,10 +477,9 @@ function scheduleQuality(rounds, players){
     return {maxRepeat, sumSquares, maxPartnerRepeat, partnerSumSquares};
 }
 
-function generateBalancedSchedule(players, attempts = 250){
+function generateBalancedSchedule(players, courts, attempts = 250){
     const count = players.length;
 
-    const courts = Math.floor(count / 4);
     const playersPerRound = courts * 4;
 
     const totalPartnerships = count * (count - 1) / 2;
@@ -686,8 +753,16 @@ function balanceTeamSides(rounds, players){
  * plays every other team exactly once - via the classic "circle
  * method": fix the first team, rotate the rest each round. A null
  * placeholder handles an odd team count by giving one team a bye.
+ *
+ * The circle method naturally produces floor(teamCount/2) matches per
+ * cycle-round. When the available courts are fewer than that, the
+ * matches get re-chunked into as many actual rounds as it takes to
+ * fit everyone within the real court count, without breaking the
+ * round-robin guarantee (each pairing still happens exactly once) -
+ * matches that don't fit in the current chunk (because one of their
+ * teams is already playing in it) simply roll over to the next one.
  */
-function generateTeamSchedule(players){
+function generateTeamSchedule(players, courts){
     const teams = [];
 
     for(let i=0; i<players.length; i+=2){
@@ -696,23 +771,19 @@ function generateTeamSchedule(players){
 
     const hasBye = teams.length % 2 !== 0;
     const rotating = hasBye ? [...teams, null] : [...teams];
-    const totalRounds = rotating.length - 1;
+    const cycleRounds = rotating.length - 1;
 
-    const rounds = [];
+    const allMatches = [];
 
-    for(let round=0; round<totalRounds; round++){
-        const roundPairs = [];
-
+    for(let round=0; round<cycleRounds; round++){
         for(let i=0; i<rotating.length / 2; i++){
             const teamA = rotating[i];
             const teamB = rotating[rotating.length - 1 - i];
 
             if(teamA && teamB){
-                roundPairs.push(teamA, teamB);
+                allMatches.push([teamA, teamB]);
             }
         }
-
-        rounds.push(createRound(players, roundPairs));
 
         const fixed = rotating[0];
         const rest = rotating.slice(1);
@@ -722,10 +793,35 @@ function generateTeamSchedule(players){
         rotating.splice(0, rotating.length, fixed, ...rest);
     }
 
+    const rounds = [];
+    let index = 0;
+
+    while(index < allMatches.length){
+        const roundPairs = [];
+        const usedTeams = new Set();
+
+        while(roundPairs.length / 2 < courts && index < allMatches.length){
+            const [teamA, teamB] = allMatches[index];
+            const teamAKey = teamA.map(p=>p.name).join("|");
+            const teamBKey = teamB.map(p=>p.name).join("|");
+
+            if(usedTeams.has(teamAKey) || usedTeams.has(teamBKey)){
+                break;
+            }
+
+            roundPairs.push(teamA, teamB);
+            usedTeams.add(teamAKey);
+            usedTeams.add(teamBKey);
+            index++;
+        }
+
+        rounds.push(createRound(players, roundPairs));
+    }
+
     return rounds;
 }
 
-function generateAmericanoSchedule(players) {
+function generateAmericanoSchedule(players, courts) {
     const count = players.length;
 
     if(count < 6 || count > 20 || count % 2 !== 0){
@@ -734,8 +830,8 @@ function generateAmericanoSchedule(players) {
     }
 
     return tournamentFormat === "teams"
-        ? generateTeamSchedule(players)
-        : generateBalancedSchedule(players);
+        ? generateTeamSchedule(players, courts)
+        : generateBalancedSchedule(players, courts);
 }
 
 /* ================================================================== Create Tournament =============================================================== */
@@ -764,6 +860,8 @@ if(count < 6 || count > 20 || count % 2 !== 0){
 
 if (!continueTournament) {
 tournamentFormat = getTournamentFormat();
+courtCount = getCourtCount();
+saveCourtCountPreference();
 
 const useRatings =
     shouldUsePlaytomicRatings();
@@ -796,7 +894,7 @@ for(let i=1;i<=count;i++){
 /* ================================================================== Rounds generation ============================================================== */
 if (americanoRounds.length === 0) {
     americanoRounds =
-        generateAmericanoSchedule(tournamentPlayers);
+        generateAmericanoSchedule(tournamentPlayers, courtCount);
 
     americanoRounds =
         balanceTeamSides(
@@ -827,6 +925,10 @@ let pairingsHTML = `
         <div class="stat">
             <span>Players</span>
             <strong>${count}</strong>
+        </div>
+        <div class="stat">
+            <span>Courts</span>
+            <strong>${courtCount}</strong>
         </div>
         <div class="stat">
             <span>Rounds</span>

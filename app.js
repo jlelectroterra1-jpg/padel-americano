@@ -98,6 +98,25 @@ function playerFieldHtml(index, useRatings){
 `;
 }
 
+function updateCourtCountVisibility(){
+    const isKotc =
+        getTournamentFormat() === "kotc";
+
+    const courtGroup =
+        document.getElementById("courtCountGroup");
+
+    const kotcNote =
+        document.getElementById("kotcCourtNote");
+
+    if(courtGroup){
+        courtGroup.style.display = isKotc ? "none" : "block";
+    }
+
+    if(kotcNote){
+        kotcNote.style.display = isKotc ? "block" : "none";
+    }
+}
+
 function generatePlayers(){
 
     const count = parseInt(
@@ -105,6 +124,7 @@ function generatePlayers(){
     );
 
     refreshCourtOptions();
+    updateCourtCountVisibility();
 
     const container =
         document.getElementById("players");
@@ -163,8 +183,9 @@ let courtCount = 1;
 
 let currentRound = 1;
 let totalRounds = 0;
-let targetScore = 21; 
+let targetScore = 21;
 let americanoRounds = [];
+let kotcPartnerCounts = {};
 
 function getPlayerViewUrl(){
     const publicAppUrl =
@@ -625,6 +646,13 @@ function getLeaderboardData(){
             const diff =
                 player.points - player.against;
 
+            const maxPartners =
+                tournamentPlayers.length - 1;
+
+            const partnersLabel =
+                `${player.partners.length}/${maxPartners}` +
+                (player.partners.length >= maxPartners ? " ✅" : "");
+
             return {
                 name:player.name,
                 points:player.points,
@@ -632,7 +660,7 @@ function getLeaderboardData(){
                 diff:diff > 0 ? `+${diff}` : diff,
                 played:player.played,
                 wins:player.wins,
-                partners:`${player.partners.length}/${tournamentPlayers.length - 1}`
+                partners:partnersLabel
             };
         });
 }
@@ -821,6 +849,108 @@ function generateTeamSchedule(players, courts){
     return rounds;
 }
 
+/*
+ * King of the Court: partners are NOT fixed - every round, the four
+ * players who land on a court (via promotion/relegation from the
+ * previous round's results) get split into two brand new pairs.
+ * Court 1 is the top ("king") court. Each round:
+ *   - Court 1 gets: winners of court 1 + winners of court 2
+ *   - a middle court gets: losers of the court above + winners of
+ *     the court below
+ *   - the bottom court gets: losers of the two bottom courts
+ * When splitting a court's four arrivals into two new pairs, the
+ * only two valid splits are the ones that DON'T recreate either pair
+ * they arrived as - between those two, pick whichever pairs up
+ * players who've partnered least (0 times beats 1, etc).
+ */
+function recordKotcPartnership(pairs){
+    pairs.forEach(pair=>{
+        const key =
+            getPairKey(pair[0], pair[1]);
+
+        kotcPartnerCounts[key] =
+            (kotcPartnerCounts[key] || 0) + 1;
+    });
+}
+
+function splitIntoNewKotcPairs(fourPlayers){
+    const [a, b, c, d] = fourPlayers;
+
+    const optionOne = [[a, c], [b, d]];
+    const optionTwo = [[a, d], [b, c]];
+
+    function optionScore(option){
+        return option.reduce((sum, pair)=>{
+            const key =
+                getPairKey(pair[0], pair[1]);
+
+            return sum + (kotcPartnerCounts[key] || 0);
+        }, 0);
+    }
+
+    const scoreOne = optionScore(optionOne);
+    const scoreTwo = optionScore(optionTwo);
+
+    if(scoreOne === scoreTwo){
+        return Math.random() < 0.5 ? optionOne : optionTwo;
+    }
+
+    return scoreOne < scoreTwo ? optionOne : optionTwo;
+}
+
+function generateInitialKotcRound(players, courts){
+    const shuffled =
+        [...players].sort(()=> Math.random() - 0.5);
+
+    const pairs = [];
+
+    for(let court=0; court<courts; court++){
+        const courtPlayers =
+            shuffled.slice(court * 4, court * 4 + 4);
+
+        pairs.push(
+            [courtPlayers[0], courtPlayers[1]],
+            [courtPlayers[2], courtPlayers[3]]
+        );
+    }
+
+    recordKotcPartnership(pairs);
+
+    return createRound(players, pairs);
+}
+
+function generateNextKotcRound(courtResults, players, courts){
+    const newPairs = [];
+
+    for(let court=0; court<courts; court++){
+        let arrivingTeamA;
+        let arrivingTeamB;
+
+        if(court === 0){
+            arrivingTeamA = courtResults[0].winner;
+            arrivingTeamB = courtResults[1].winner;
+        } else if(court === courts - 1){
+            arrivingTeamA = courtResults[court - 1].loser;
+            arrivingTeamB = courtResults[court].loser;
+        } else {
+            arrivingTeamA = courtResults[court - 1].loser;
+            arrivingTeamB = courtResults[court + 1].winner;
+        }
+
+        const fourPlayers =
+            [...arrivingTeamA, ...arrivingTeamB];
+
+        const newTeams =
+            splitIntoNewKotcPairs(fourPlayers);
+
+        newPairs.push(newTeams[0], newTeams[1]);
+    }
+
+    recordKotcPartnership(newPairs);
+
+    return createRound(players, newPairs);
+}
+
 function generateAmericanoSchedule(players, courts) {
     const count = players.length;
 
@@ -849,6 +979,11 @@ function createTournament(continueTournament = false){
 
 if(count < 6 || count > 20 || count % 2 !== 0){
     alert("Please choose an even player count from 6 to 20.");
+    return;
+}
+
+if(!continueTournament && getTournamentFormat() === "kotc" && (count < 8 || count % 4 !== 0)){
+    alert("King of the Court needs a player count divisible by 4 (8, 12, 16, or 20) so every court has 4 players.");
     return;
 }
 
@@ -893,8 +1028,19 @@ for(let i=1;i<=count;i++){
 
 /* ================================================================== Rounds generation ============================================================== */
 if (americanoRounds.length === 0) {
-    americanoRounds =
-        generateAmericanoSchedule(tournamentPlayers, courtCount);
+    if(tournamentFormat === "kotc"){
+        kotcPartnerCounts = {};
+
+        americanoRounds = [
+            generateInitialKotcRound(
+                tournamentPlayers,
+                tournamentPlayers.length / 4
+            )
+        ];
+    } else {
+        americanoRounds =
+            generateAmericanoSchedule(tournamentPlayers, courtCount);
+    }
 
     americanoRounds =
         balanceTeamSides(
@@ -1216,6 +1362,14 @@ function renderScores(){
     </button>
     `;
 
+    if(tournamentFormat === "kotc"){
+        scoresHTML += `
+        <button type="button" class="ghost-button" onclick="endKotcTournament()">
+            End Session &amp; Show Final Standings
+        </button>
+        `;
+    }
+
     scoresContainer.innerHTML = scoresHTML;
 }
 
@@ -1345,12 +1499,18 @@ function updateLeaderboard(){
                 ? `+${pointDiff}`
                 : pointDiff;
 
+        const maxPartners =
+            tournamentPlayers.length - 1;
+
+        const partnersComplete =
+            player.partners.length >= maxPartners;
+
         html += `
         <div class="leaderboard-row">
             <div class="rank">${index + 1}</div>
             <div class="leaderboard-player">
                 <strong>${player.name}</strong>
-                <span>Partners ${player.partners.length}/${tournamentPlayers.length - 1}</span>
+                <span>Partners ${player.partners.length}/${maxPartners}${partnersComplete ? " ✅" : ""}</span>
             </div>
             <div class="leaderboard-stats">
                 <div class="leaderboard-stat">
@@ -1397,6 +1557,8 @@ function submitRound(round){
             `input[id^="r${round}c"]`
         );
 
+    const courtResults = [];
+
     for(let i=0; i<courts.length; i+=2){
 
         const scoreA =
@@ -1419,6 +1581,11 @@ function submitRound(round){
             roundData.pairs[courtIndex * 2];
         const teamB =
             roundData.pairs[courtIndex * 2 + 1];
+
+        courtResults.push({
+            winner: scoreA > scoreB ? teamA : teamB,
+            loser: scoreA > scoreB ? teamB : teamA
+        });
 
         teamA.forEach(player=>{
             player.points += scoreA;
@@ -1461,6 +1628,28 @@ function submitRound(round){
         }
     }
 
+if(tournamentFormat === "kotc"){
+    const nextRound =
+        generateNextKotcRound(
+            courtResults,
+            tournamentPlayers,
+            tournamentPlayers.length / 4
+        );
+
+    americanoRounds.push(nextRound);
+    totalRounds = americanoRounds.length;
+
+    alert(
+        `Round ${round} complete!\n\nProceeding to Round ${round + 1}`
+    );
+
+    currentRound++;
+
+    createTournament(true);
+    showTab("scores");
+    return;
+}
+
 if(round >= totalRounds){
     alert(
         `Round ${round} complete!\n\nTournament complete!`
@@ -1480,6 +1669,15 @@ currentRound++;
 
 createTournament(true);
 showTab("scores");
+}
+
+function endKotcTournament(){
+    if(!confirm("End the King of the Court session and show final standings?")){
+        return;
+    }
+
+    currentRound = totalRounds + 1;
+    createTournament(true);
 }
 
 /*

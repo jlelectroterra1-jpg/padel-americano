@@ -40,6 +40,7 @@
         <select id="tournamentFormat" onchange="generatePlayers()">
             <option value="singles">Singles (rotating partners)</option>
             <option value="teams">Teams (fixed partners)</option>
+            <option value="kotc">King of the Court (winners up, losers down)</option>
         </select>
 
         <label>Number of Players</label>
@@ -55,9 +56,15 @@
             <option value="20">20</option>
         </select>
 
-        <label>Number of Courts</label>
+        <div id="courtCountGroup">
+            <label>Number of Courts</label>
 
-        <select id="courtCount" onchange="saveCourtCountPreference()"></select>
+            <select id="courtCount" onchange="saveCourtCountPreference()"></select>
+        </div>
+
+        <p id="kotcCourtNote" class="leaderboard-note" style="display:none;">
+            In King of the Court, courts are set by player count (players &divide; 4) so every court always has 4 players - Court 1 is the top ("king") court.
+        </p>
 
         <button onclick="generatePlayers()">
             Create Player Fields
